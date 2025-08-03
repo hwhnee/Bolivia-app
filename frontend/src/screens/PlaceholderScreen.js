@@ -1,0 +1,9 @@
+import React from 'react';
+// --- /src/screens/PlaceholderScreen.js ---
+const PlaceholderScreen = ({ screenName }) => (
+    <div className="bg-white rounded-lg shadow-lg p-6 md:p-8">
+        <h2 className="text-2xl font-bold mb-4 text-gray-700">{screenName}</h2>
+        <p>이 화면은 현재 개발 중입니다.</p>
+    </div>
+);
+export default PlaceholderScreen;
