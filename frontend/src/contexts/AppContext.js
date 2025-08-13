@@ -1,58 +1,59 @@
+// (auto-concat)
 import React, { useState, createContext, useContext } from 'react';
 import { CONSTANTS } from '../constants';
 // --- /src/contexts/AppContext.js ---
-// 전역 상태 관리를 위한 React Context를 생성합니다.
+// Crea un Context de React para la gestión del estado global.
 const AppContext = createContext(null);
 export const useAppContext = () => {
     const context = useContext(AppContext);
-    if (context === null) {
-        throw new Error("useAppContext must be used within an AppProvider");
-    }
+    if (context === null) throw new Error("useAppContext must be used within an AppProvider");
     return context;
 };
 export const AppProvider = ({ children }) => {
     const [persona, setPersona] = useState('resident');
     const [activeView, setActiveView] = useState('auth');
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [toast, setToast] = useState({ message: '', isVisible: false });
+
     const showToast = (message) => {
         setToast({ message, isVisible: true });
         setTimeout(() => setToast({ message: '', isVisible: false }), 3000);
     };
+
     const navigateTo = (viewId) => {
         setActiveView(viewId);
         setIsMenuOpen(false);
     };
-    const handlePersonaChange = (newPersona) => {
-        setPersona(newPersona);
-        setIsLoggedIn(false);
-        setActiveView('auth');
-    };
+    
     const handleLoginSuccess = (loggedInPersona) => {
-        if(loggedInPersona === persona) {
-            setIsLoggedIn(true);
-            setActiveView('dashboard');
-        }
+        setPersona(loggedInPersona);
+        const mockHousehold = {
+            id: 1,
+            building_number: 'Torre 101',
+            unit_number: 'Apto 1502'
+        };
+        const mockUser = {
+            id: 1,
+            household_id: mockHousehold.id,
+            email: CONSTANTS.USERS[loggedInPersona].email,
+            username: loggedInPersona === 'resident' ? 'Juan Residente' : 'Pedro Admin',
+            role: loggedInPersona === 'resident' ? 'ROLE_USER' : 'ROLE_ADMIN',
+            household: mockHousehold
+        };
+        setCurrentUser(mockUser);
+        setIsLoggedIn(true);
+        setActiveView('dashboard');
     };
+
     const handleLogout = () => {
         setIsLoggedIn(false);
+        setCurrentUser(null);
         setActiveView('auth');
-        showToast("로그아웃되었습니다.");
+        showToast("Se ha cerrado la sesión.");
     };
-    const value = {
-        persona,
-        activeView,
-        isLoggedIn,
-        isMenuOpen,
-        contentData: CONSTANTS.CONTENT_DATA,
-        toast,
-        navigateTo,
-        handlePersonaChange,
-        handleLoginSuccess,
-        handleLogout,
-        showToast,
-        setIsMenuOpen,
-    };
+
+    const value = { persona, activeView, isLoggedIn, currentUser, setCurrentUser, isMenuOpen, contentData: CONSTANTS.CONTENT_DATA, toast, navigateTo, handleLoginSuccess, handleLogout, showToast, setIsMenuOpen };
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

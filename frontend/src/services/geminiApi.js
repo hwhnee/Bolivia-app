@@ -1,6 +1,7 @@
+// (auto-concat)
 import { CONSTANTS } from '../constants';
 // --- /src/services/geminiApi.js ---
-// Gemini API 호출 로직을 별도의 서비스 함수로 분리합니다.
+// Separa la lógica de la llamada a la API de Gemini en una función de servicio independiente.
 export const callGeminiAPI = async (prompt) => {
     const apiUrl = `${CONSTANTS.API_URL}?key=${CONSTANTS.API_KEY}`;
     const payload = { contents: [{ parts: [{ text: prompt }] }] };
@@ -15,9 +16,9 @@ export const callGeminiAPI = async (prompt) => {
         if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
             return data.candidates[0].content.parts[0].text;
         }
-        return "AI로부터 응답을 받지 못했습니다. 잠시 후 다시 시도해주세요.";
+        return "No se pudo recibir una respuesta de la IA. Por favor, inténtelo de nuevo más tarde.";
     } catch (error) {
         console.error("Gemini API call failed:", error);
-        return "AI 호출 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.";
+        return "Ocurrió un error durante la llamada a la IA. Por favor, verifique su conexión de red.";
     }
 };

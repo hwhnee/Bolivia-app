@@ -7,8 +7,8 @@ services:
     restart: unless-stopped
     environment:
       - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/${MYSQL_DATABASE}?useSSL=false&serverTimezone=Asia/Seoul
-      - SPRING_DATASOURCE_USERNAME=${DB_USER}
-      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}   # DB_USER -> MYSQL_USER
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD} # DB_PASSWORD -> MYSQL_PASSWORD
       - APP_JWT_SECRET=${JWT_SECRET}
     depends_on:
       - db
@@ -42,8 +42,8 @@ services:
       - "443:443"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - certbot_conf:/etc/letsencrypt
-      - certbot_www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt #실제 경로로 수정
+      - ./certbot/www:/var/www/certbot
     depends_on:
       - backend
     networks:
@@ -51,9 +51,10 @@ services:
 
 volumes:
   db_data:
-  certbot_conf:
-  certbot_www:
+  # certbot_conf:
+  # certbot_www:
 
 networks:
   bolivia-network:
     driver: bridge
+

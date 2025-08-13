@@ -1,36 +1,90 @@
+// (auto-concat)
 import React, { useState } from 'react';
 import { callGeminiAPI } from '../../services/geminiApi';
+import { useAppContext } from '../../contexts/AppContext';
 import PhoneMockup from '../../components/common/PhoneMockup';
 import HomeButton from '../../components/common/HomeButton';
 // --- /src/screens/resident/MaintenanceScreen.js ---
 const MaintenanceScreen = () => {
-    const [prompt, setPrompt] = useState('');
-    const [result, setResult] = useState('');
-    const [status, setStatus] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const handleDiagnose = async () => {
-        if (!prompt) { setStatus('문제 상황을 입력해주세요.'); return; }
-        setIsLoading(true);
-        setStatus('✨ AI가 문제를 진단 중입니다...');
-        setResult('');
-        const fullPrompt = `사용자가 아파트에서 겪는 문제를 설명하고 있습니다: "${prompt}". 이 설명을 바탕으로, 다음 세 가지 항목을 포함하는 답변을 한국어로, 명확하게 섹션을 나누어 마크다운 형식으로 생성해주세요:\n\n1. **예상 원인:** 가장 가능성 있는 문제 원인을 간단히 추측해주세요.\n2. **주민 조치사항:** 주민이 즉시 취할 수 있는 안전 조치를 제안해주세요 (예: '메인 밸브를 잠그세요').\n3. **관리실 신고서 초안:** 관리실에 보낼 공식적인 '문제 신고' 내용을 '문제 유형'과 '상세 설명' 형식으로 작성해주세요. 문제 유형은 '배관', '전기', '구조', '기타' 중 하나로 분류해주세요.`;
-        const apiResult = await callGeminiAPI(fullPrompt);
-        const htmlResult = apiResult.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br />');
-        setResult(htmlResult);
-        setStatus('진단이 완료되었습니다!');
-        setIsLoading(false);
+    const { showToast, currentUser } = useAppContext();
+    const [requests, setRequests] = useState([
+        { id: 1, category: 'Plomería', description: 'Hay una pequeña fuga de agua debajo del fregadero de la cocina.', status: 'Completado', created_at: '2025-08-01' },
+        { id: 2, category: 'Electricidad', description: 'La luz de la sala parpadea.', status: 'En Proceso', created_at: '2025-08-09' },
+    ]);
+    const [isFormVisible, setIsFormVisible] = useState(false);
+    const [formData, setFormData] = useState({ category: 'Plomería', description: '' });
+
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        const newRequest = {
+            id: Date.now(),
+            requester_id: currentUser.id,
+            category: formData.category,
+            description: formData.description,
+            status: 'Recibido',
+            created_at: new Date().toISOString().split('T')[0]
+        };
+        setRequests(prev => [newRequest, ...prev]);
+        showToast("Se ha recibido la solicitud de mantenimiento.");
+        setIsFormVisible(false);
+        setFormData({ category: 'Plomería', description: '' });
+    };
+
+    const statusColor = { 'Recibido': 'text-yellow-500', 'En Proceso': 'text-blue-500', 'Completado': 'text-green-500', 'En Espera': 'text-gray-500' };
+
     return (
-        <PhoneMockup>
-            <div className="relative space-y-4">
+        <PhoneMockup theme="light">
+            <div className="relative h-[650px] flex flex-col">
                 <HomeButton />
-                <h3 className="text-xl font-bold text-center">✨ AI 유지보수 진단</h3>
-                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="문제 상황을 자유롭게 설명해주세요." rows="4" className="w-full p-3 rounded bg-gray-600 placeholder-gray-400 text-white border border-gray-500" />
-                <button onClick={handleDiagnose} disabled={isLoading} className="w-full p-3 rounded bg-gradient-to-r from-fuchsia-600 to-violet-500 hover:from-fuchsia-700 hover:to-violet-600 text-white font-bold transition-colors disabled:opacity-50">
-                    {isLoading ? '진단 중...' : '✨ AI로 문제 진단 및 신고서 작성'}
-                </button>
-                <div className="text-sm text-center text-fuchsia-300 h-4">{status}</div>
-                {result && <div className="bg-gray-800 p-3 rounded-lg text-sm space-y-2" dangerouslySetInnerHTML={{ __html: result }} />}
+                <h3 className="text-xl font-bold text-center mb-4 flex-shrink-0">Reporte de Problemas y Mantenimiento</h3>
+                
+                {!isFormVisible && (
+                    <button onClick={() => setIsFormVisible(true)} className="w-full p-3 rounded-lg bg-teal-600 text-white font-bold hover:bg-teal-700 mb-4">
+                        + Reportar Nuevo Problema
+                    </button>
+                )}
+
+                {isFormVisible && (
+                    <form onSubmit={handleSubmit} className="bg-white p-3 rounded-lg shadow mb-4 space-y-3">
+                        <h4 className="font-semibold">Reportar Nuevo Problema</h4>
+                        <div>
+                            <label className="text-xs font-medium">Tipo de Problema</label>
+                            <select name="category" value={formData.category} onChange={handleInputChange} className="w-full p-2 border rounded mt-1 text-sm">
+                                <option>Plomería</option>
+                                <option>Electricidad</option>
+                                <option>Instalación</option>
+                                <option>Otro</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium">Descripción Detallada</label>
+                            <textarea name="description" value={formData.description} onChange={handleInputChange} rows="3" placeholder="Describa el problema en detalle." className="w-full p-2 border rounded mt-1 text-sm" required></textarea>
+                        </div>
+                        <div className="flex gap-2">
+                            <button type="submit" className="w-full bg-teal-600 text-white p-2 rounded text-sm hover:bg-teal-700">Enviar Reporte</button>
+                            <button type="button" onClick={() => setIsFormVisible(false)} className="w-full bg-gray-300 text-gray-800 p-2 rounded text-sm hover:bg-gray-400">Cancelar</button>
+                        </div>
+                    </form>
+                )}
+
+                <div className="flex-grow overflow-y-auto space-y-2">
+                    <h4 className="font-semibold mb-2">Estado de Mis Solicitudes</h4>
+                    {requests.map(req => (
+                        <div key={req.id} className="bg-white p-3 rounded-lg shadow">
+                            <div className="flex justify-between items-start">
+                                <p className="font-bold text-sm">{req.category}</p>
+                                <p className={`text-xs font-bold ${statusColor[req.status]}`}>{req.status}</p>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-1">{req.description}</p>
+                            <p className="text-right text-xs text-gray-400 mt-2">{req.created_at}</p>
+                        </div>
+                    ))}
+                </div>
             </div>
         </PhoneMockup>
     );

@@ -1,25 +1,74 @@
+// (auto-concat)
 import React, { useState } from 'react';
 import PhoneMockup from '../../components/common/PhoneMockup';
 import Modal from '../../components/common/Modal';
 import HomeButton from '../../components/common/HomeButton';
 // --- /src/screens/resident/PaymentScreen.js ---
+
 const PaymentScreen = () => {
     const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+    const [selectedBill, setSelectedBill] = useState(null);
+
+    const mockBills = [
+        { id: 1, bill_month: '2025-08', total_amount: 150000, status: 'Pendiente', due_date: '2025-08-31', items: [
+            { item_name: 'Cuota de administración', amount: 100000 },
+            { item_name: 'Consumo de agua', amount: 30000 },
+            { item_name: 'Electricidad común', amount: 20000 },
+        ]},
+        { id: 2, bill_month: '2025-07', total_amount: 145000, status: 'Pagado', due_date: '2025-07-31', items: [
+            { item_name: 'Cuota de administración', amount: 100000 },
+            { item_name: 'Consumo de agua', amount: 25000 },
+            { item_name: 'Electricidad común', amount: 20000 },
+        ]},
+    ];
+
+    const toggleBillDetails = (billId) => {
+        setSelectedBill(selectedBill === billId ? null : billId);
+    };
+
     return (
         <>
-            <PhoneMockup>
+            <PhoneMockup theme="light">
                 <div className="relative h-full flex flex-col">
                     <HomeButton />
-                    <h3 className="text-xl font-bold text-center mb-4">결제 및 청구</h3>
-                    <div className="bg-gray-600 p-4 rounded-lg flex-grow">
-                        <p className="text-gray-400 text-sm">총 미납 요금</p><p className="text-3xl font-bold">₩150,000</p>
+                    <h3 className="text-xl font-bold text-center mb-4">Pagos y Facturación</h3>
+                    <div className="space-y-3 overflow-y-auto flex-grow">
+                        {mockBills.map(bill => (
+                            <div key={bill.id} className="bg-white rounded-lg shadow p-3 cursor-pointer" onClick={() => toggleBillDetails(bill.id)}>
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="font-bold">Cuotas de {bill.bill_month}</p>
+                                        <p className="text-sm text-gray-500">Fecha de vencimiento: {bill.due_date}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className={`font-bold ${bill.status === 'Pendiente' ? 'text-red-500' : 'text-green-500'}`}>{bill.status}</p>
+                                        <p className="text-sm">{bill.total_amount.toLocaleString()} $</p>
+                                    </div>
+                                </div>
+                                {selectedBill === bill.id && (
+                                    <div className="mt-3 pt-3 border-t border-gray-200 space-y-1 text-xs">
+                                        <h4 className="font-semibold mb-1">Detalles</h4>
+                                        {bill.items.map(item => (
+                                            <div key={item.item_name} className="flex justify-between">
+                                                <span>{item.item_name}</span>
+                                                <span>{item.amount.toLocaleString()} $</span>
+                                            </div>
+                                        ))}
+                                        {bill.status === 'Pendiente' && (
+                                            <button onClick={(e) => { e.stopPropagation(); setIsQrModalOpen(true); }} className="w-full mt-3 p-2 rounded bg-teal-600 text-white hover:bg-teal-700 font-bold text-sm transition-colors">
+                                                Pagar con Código QR
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                     </div>
-                    <button onClick={() => setIsQrModalOpen(true)} className="w-full mt-4 p-3 rounded bg-teal-600 hover:bg-teal-700 font-bold transition-colors">QR코드로 결제</button>
                 </div>
             </PhoneMockup>
-            <Modal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} title="QR코드 결제">
-                <p className="text-center">결제 QR코드를 스캔하여 관리비를 납부하세요.</p>
-                <img src="https://placehold.co/300x300/ffffff/000000?text=결제용+QR코드" alt="Payment QR Code" className="mx-auto mt-4 rounded-lg" />
+            <Modal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} title="Pago con Código QR">
+                <p className="text-center">Escanee el código QR para pagar las cuotas de mantenimiento.</p>
+                <img src="https://placehold.co/300x300/ffffff/000000?text=Código+QR+de+Pago" alt="Payment QR Code" className="mx-auto mt-4 rounded-lg" />
             </Modal>
         </>
     );

@@ -1,48 +1,99 @@
+// (auto-concat)
 import React, { useState } from 'react';
 import { useAppContext } from '../../contexts/AppContext';
 import { callGeminiAPI } from '../../services/geminiApi';
 import PhoneMockup from '../../components/common/PhoneMockup';
 import HomeButton from '../../components/common/HomeButton';
+import Modal from '../../components/common/Modal';
 // --- /src/screens/resident/CommunityScreen.js ---
 const CommunityScreen = () => {
-    const { showToast } = useAppContext();
-    const [prompt, setPrompt] = useState('');
-    const [content, setContent] = useState('');
-    const [status, setStatus] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const handleGenerate = async () => {
-        if (!prompt) { setStatus('게시물 주제를 입력해주세요.'); return; }
-        setIsLoading(true);
-        setStatus('✨ AI가 게시물을 작성 중입니다...');
-        const fullPrompt = `친절하고 명확한 어조로 한국어 중고 장터 게시글 초안을 작성해줘. 사용자는 다음 항목을 팔고 싶어해: "${prompt}". 제목, 간단한 설명, 그리고 가격 및 상세 문의를 위해 연락달라는 내용을 포함해줘.`;
-        const result = await callGeminiAPI(fullPrompt);
-        setContent(result);
-        setStatus('작성이 완료되었습니다!');
-        setIsLoading(false);
+    const { showToast, currentUser } = useAppContext();
+    const [posts, setPosts] = useState([
+        { id: 1, author_id: 2, author_name: 'Pedro Admin', category: 'Anuncios', title: 'Aviso de fumigación de verano en el complejo', content: 'Para mantener un ambiente agradable para nuestros residentes, llevaremos a cabo la fumigación periódica del complejo como se detalla a continuación. Agradecemos su cooperación.', created_at: '2025-08-08' },
+        { id: 2, author_id: 1, author_name: 'Juan Residente', category: 'Mercado', title: 'Vendo bicicleta para niños', content: 'Vendo bicicleta en buen estado a un precio económico porque mi hijo ya creció. Interesados, por favor contactar a la unidad 101-1502.', created_at: '2025-08-10' },
+    ]);
+    const [isFormVisible, setIsFormVisible] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedPost, setSelectedPost] = useState(null);
+    const [formData, setFormData] = useState({ category: 'Foro Libre', title: '', content: '' });
+
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
-    const handlePost = () => {
-        if (!content) {
-            showToast("게시할 내용이 없습니다.");
-            return;
-        }
-        showToast("게시글이 성공적으로 등록되었습니다.");
-        setPrompt('');
-        setContent('');
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        const newPost = {
+            id: Date.now(),
+            author_id: currentUser.id,
+            author_name: currentUser.username,
+            category: formData.category,
+            title: formData.title,
+            content: formData.content,
+            created_at: new Date().toISOString().split('T')[0]
+        };
+        setPosts(prev => [newPost, ...prev]);
+        showToast("La publicación ha sido registrada.");
+        setIsFormVisible(false);
+        setFormData({ category: 'Foro Libre', title: '', content: '' });
     };
+
+    const openPostModal = (post) => {
+        setSelectedPost(post);
+        setIsModalOpen(true);
+    };
+
     return (
-        <PhoneMockup>
-            <div className="relative space-y-4">
-                <HomeButton />
-                <h3 className="text-xl font-bold text-center">새 글 작성</h3>
-                <input value={prompt} onChange={(e) => setPrompt(e.target.value)} type="text" placeholder="게시물 주제 또는 키워드 입력..." className="w-full p-3 rounded bg-gray-600 placeholder-gray-400 text-white border border-gray-500" />
-                <button onClick={handleGenerate} disabled={isLoading} className="w-full p-3 rounded bg-gradient-to-r from-fuchsia-600 to-violet-500 hover:from-fuchsia-700 hover:to-violet-600 text-white font-bold transition-colors disabled:opacity-50">
-                    {isLoading ? '작성 중...' : '✨ AI로 게시물 초안 작성'}
-                </button>
-                <div className="text-sm text-center text-fuchsia-300 h-4">{status}</div>
-                <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="AI가 생성한 게시물 내용이 여기에 표시됩니다." rows="6" className="w-full p-3 rounded bg-gray-800 border border-gray-500" />
-                <button onClick={handlePost} className="w-full p-3 rounded bg-teal-600 hover:bg-teal-700 font-bold transition-colors">게시하기</button>
-            </div>
-        </PhoneMockup>
+        <>
+            <PhoneMockup theme="light">
+                <div className="relative h-[650px] flex flex-col">
+                    <HomeButton />
+                    <h3 className="text-xl font-bold text-center mb-4 flex-shrink-0">Comunidad</h3>
+                    
+                    {!isFormVisible && (
+                        <button onClick={() => setIsFormVisible(true)} className="w-full p-3 rounded-lg bg-teal-600 text-white font-bold hover:bg-teal-700 mb-4">
+                            + Crear Nueva Publicación
+                        </button>
+                    )}
+
+                    {isFormVisible && (
+                        <form onSubmit={handleSubmit} className="bg-white p-3 rounded-lg shadow mb-4 space-y-3">
+                            <h4 className="font-semibold">Nueva Publicación</h4>
+                            <select name="category" value={formData.category} onChange={handleInputChange} className="w-full p-2 border rounded text-sm"><option>Foro Libre</option><option>Mercado</option></select>
+                            <input name="title" value={formData.title} onChange={handleInputChange} placeholder="Título" className="w-full p-2 border rounded text-sm" required />
+                            <textarea name="content" value={formData.content} onChange={handleInputChange} rows="3" placeholder="Escriba el contenido aquí." className="w-full p-2 border rounded text-sm" required></textarea>
+                            <div className="flex gap-2">
+                                <button type="submit" className="w-full bg-teal-600 text-white p-2 rounded text-sm hover:bg-teal-700">Publicar</button>
+                                <button type="button" onClick={() => setIsFormVisible(false)} className="w-full bg-gray-300 text-gray-800 p-2 rounded text-sm hover:bg-gray-400">Cancelar</button>
+                            </div>
+                        </form>
+                    )}
+
+                    <div className="flex-grow overflow-y-auto space-y-2">
+                        <h4 className="font-semibold mb-2">Lista de Publicaciones</h4>
+                        {posts.map(post => (
+                            <div key={post.id} onClick={() => openPostModal(post)} className="bg-white p-3 rounded-lg shadow cursor-pointer">
+                                <div className="flex justify-between items-start">
+                                    <span className="text-xs bg-sky-100 text-sky-800 px-2 py-1 rounded-full font-semibold">{post.category}</span>
+                                    <span className="text-xs text-gray-400">{post.created_at}</span>
+                                </div>
+                                <p className="font-bold text-sm mt-2 truncate">{post.title}</p>
+                                <p className="text-xs text-gray-500 mt-1">Autor: {post.author_name}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </PhoneMockup>
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={selectedPost?.title}>
+                <div className="space-y-4">
+                    <div className="text-sm text-gray-500">
+                        <span>Categoría: {selectedPost?.category}</span> | <span>Autor: {selectedPost?.author_name}</span>
+                    </div>
+                    <p className="text-gray-700 whitespace-pre-wrap">{selectedPost?.content}</p>
+                </div>
+            </Modal>
+        </>
     );
 };
 export default CommunityScreen;
