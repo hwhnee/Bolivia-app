@@ -27,22 +27,14 @@ export const AppProvider = ({ children }) => {
         setIsMenuOpen(false);
     };
     
-    const handleLoginSuccess = (loggedInPersona) => {
-        setPersona(loggedInPersona);
+    const handleLoginSuccess = (user, accessToken) => {
+        setPersona(user.role === 'ROLE_ADMIN' ? 'admin' : 'resident');
         const mockHousehold = {
             id: 1,
             building_number: 'Torre 101',
             unit_number: 'Apto 1502'
         };
-        const mockUser = {
-            id: 1,
-            household_id: mockHousehold.id,
-            email: CONSTANTS.USERS[loggedInPersona].email,
-            username: loggedInPersona === 'resident' ? 'Juan Residente' : 'Pedro Admin',
-            role: loggedInPersona === 'resident' ? 'ROLE_USER' : 'ROLE_ADMIN',
-            household: mockHousehold
-        };
-        setCurrentUser(mockUser);
+        setCurrentUser(user);
         setIsLoggedIn(true);
         setActiveView('dashboard');
     };

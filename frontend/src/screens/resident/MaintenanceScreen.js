@@ -1,38 +1,65 @@
-// (auto-concat)
-import React, { useState } from 'react';
-import { callGeminiAPI } from '../../services/geminiApi';
-import { useAppContext } from '../../contexts/AppContext';
-import PhoneMockup from '../../components/common/PhoneMockup';
-import HomeButton from '../../components/common/HomeButton';
-// --- /src/screens/resident/MaintenanceScreen.js ---
+
+import React, { useState, useEffect } from 'react';
+import { useAppContext } from '../../contexts/AppContext'; // La ruta puede variar
+import { PhoneMockup } from '../../components/common/PhoneMockup'; // La ruta puede variar
+import { HomeButton } from '../../components/common/HomeButton'; // La ruta puede variar
+
 const MaintenanceScreen = () => {
     const { showToast, currentUser } = useAppContext();
-    const [requests, setRequests] = useState([
-        { id: 1, category: 'Plomería', description: 'Hay una pequeña fuga de agua debajo del fregadero de la cocina.', status: 'Completado', created_at: '2025-08-01' },
-        { id: 2, category: 'Electricidad', description: 'La luz de la sala parpadea.', status: 'En Proceso', created_at: '2025-08-09' },
-    ]);
+    const [requests, setRequests] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+
     const [isFormVisible, setIsFormVisible] = useState(false);
     const [formData, setFormData] = useState({ category: 'Plomería', description: '' });
+
+    // Al cargar el componente, se obtiene la lista de solicitudes desde la API
+    const fetchRequests = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const response = await fetch('/api/maintenance-requests');
+            if (!response.ok) {
+                throw new Error('No se pudo cargar la lista de solicitudes.');
+            }
+            const data = await response.json();
+            setRequests(data);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchRequests();
+    }, []);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        const newRequest = {
-            id: Date.now(),
-            requester_id: currentUser.id,
-            category: formData.category,
-            description: formData.description,
-            status: 'Recibido',
-            created_at: new Date().toISOString().split('T')[0]
-        };
-        setRequests(prev => [newRequest, ...prev]);
-        showToast("Se ha recibido la solicitud de mantenimiento.");
-        setIsFormVisible(false);
-        setFormData({ category: 'Plomería', description: '' });
+        try {
+            const response = await fetch('/api/maintenance-requests', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            if (!response.ok) {
+                throw new Error('Falló el registro de la solicitud.');
+            }
+            
+            showToast("Se ha recibido la solicitud de mantenimiento.");
+            setIsFormVisible(false);
+            setFormData({ category: 'Plomería', description: '' });
+            fetchRequests(); // Recargar la lista
+        } catch (err) {
+            showToast(`Error: ${err.message}`);
+        }
     };
 
     const statusColor = { 'Recibido': 'text-yellow-500', 'En Proceso': 'text-blue-500', 'Completado': 'text-green-500', 'En Espera': 'text-gray-500' };
@@ -55,10 +82,10 @@ const MaintenanceScreen = () => {
                         <div>
                             <label className="text-xs font-medium">Tipo de Problema</label>
                             <select name="category" value={formData.category} onChange={handleInputChange} className="w-full p-2 border rounded mt-1 text-sm">
-                                <option>Plomería</option>
-                                <option>Electricidad</option>
-                                <option>Instalación</option>
-                                <option>Otro</option>
+                                <option value="Plomería">Plomería</option>
+                                <option value="Electricidad">Electricidad</option>
+                                <option value="Instalación">Instalación</option>
+                                <option value="Otro">Otro</option>
                             </select>
                         </div>
                         <div>
@@ -74,14 +101,16 @@ const MaintenanceScreen = () => {
 
                 <div className="flex-grow overflow-y-auto space-y-2">
                     <h4 className="font-semibold mb-2">Estado de Mis Solicitudes</h4>
-                    {requests.map(req => (
+                    {isLoading && <p className="text-center">Cargando...</p>}
+                    {error && <p className="text-center text-red-500">{error}</p>}
+                    {!isLoading && !error && requests.map(req => (
                         <div key={req.id} className="bg-white p-3 rounded-lg shadow">
                             <div className="flex justify-between items-start">
                                 <p className="font-bold text-sm">{req.category}</p>
                                 <p className={`text-xs font-bold ${statusColor[req.status]}`}>{req.status}</p>
                             </div>
                             <p className="text-xs text-gray-600 mt-1">{req.description}</p>
-                            <p className="text-right text-xs text-gray-400 mt-2">{req.created_at}</p>
+                            <p className="text-right text-xs text-gray-400 mt-2">{new Date(req.created_at).toLocaleDateString()}</p>
                         </div>
                     ))}
                 </div>
@@ -89,4 +118,5 @@ const MaintenanceScreen = () => {
         </PhoneMockup>
     );
 };
+
 export default MaintenanceScreen;

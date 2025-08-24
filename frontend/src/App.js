@@ -26,6 +26,7 @@ import FinanceScreen from './screens/admin/FinanceScreen';
 import TaskScreen from './screens/admin/TaskScreen';
 import ReservationApprovalScreen from './screens/admin/ReservationApprovalScreen';
 import CommunicationScreen from './screens/admin/CommunicationScreen';
+
 // --- /src/App.js ---
 // El componente principal de la aplicación se encarga de renderizar la pantalla.
 const AppContent = () => {

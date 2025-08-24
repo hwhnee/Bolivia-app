@@ -1,23 +1,59 @@
-// (auto-concat)
-import React, { useState } from 'react';
-import { useAppContext } from '../../contexts/AppContext';
-// --- /src/screens/admin/ReservationApprovalScreen.js ---
+
+import React, { useState, useEffect } from 'react';
+import { useAppContext } from '../../contexts/AppContext'; // La ruta puede variar
+
 const ReservationApprovalScreen = () => {
     const { showToast } = useAppContext();
-    const [reservations, setReservations] = useState([
-        { id: 1, user_name: 'Juan Residente (101-1502)', facility_name: 'Área de Barbacoa', start_time: '2025-08-15 18:00', status: 'Aprobada' },
-        { id: 2, user_name: 'Ana Solicitante (102-303)', facility_name: 'Sala de Reuniones', start_time: '2025-08-16 10:00', status: 'Pendiente' },
-        { id: 3, user_name: 'Carlos Vecino (103-101)', facility_name: 'Área de Barbacoa', start_time: '2025-08-16 18:00', status: 'Rechazada' },
-        { id: 4, user_name: 'Diana Residente (104-505)', facility_name: 'Gimnasio', start_time: '2025-08-17 09:00', status: 'Cancelada' },
-    ]);
+    const [reservations, setReservations] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    const handleStatusChange = (id, newStatus) => {
-        setReservations(reservations.map(r => r.id === id ? { ...r, status: newStatus } : r));
-        showToast(`La reserva ha sido marcada como ${newStatus.toLowerCase()}.`);
+    const fetchReservations = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const response = await fetch('/api/admin/reservations');
+            if (!response.ok) {
+                throw new Error('No se pudo cargar la lista de reservas.');
+            }
+            const data = await response.json();
+            setReservations(data);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const statusText = { 'Aprobada': 'Aprobada', 'Pendiente': 'Pendiente', 'Rechazada': 'Rechazada', 'Cancelada': 'Cancelada' };
+    useEffect(() => {
+        fetchReservations();
+    }, []);
+
+    const handleStatusChange = async (id, newStatus) => {
+        try {
+            const response = await fetch(`/api/admin/reservations/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            if (!response.ok) {
+                throw new Error('No se pudo actualizar el estado.');
+            }
+            
+            // Actualiza el estado en la UI inmediatamente para una mejor experiencia de usuario
+            setReservations(reservations.map(r => r.id === id ? { ...r, status: newStatus } : r));
+            showToast(`La reserva ha sido marcada como ${newStatus.toLowerCase()}.`);
+
+        } catch (err) {
+            showToast(`Error: ${err.message}`);
+        }
+    };
+
     const statusColor = { 'Aprobada': 'text-green-800 bg-green-100', 'Pendiente': 'text-yellow-800 bg-yellow-100', 'Rechazada': 'text-red-800 bg-red-100', 'Cancelada': 'text-gray-800 bg-gray-100' };
+
+    if (isLoading) return <div className="p-6 text-center">Cargando reservas...</div>;
+    if (error) return <div className="p-6 text-center text-red-500">Error: {error}</div>;
 
     return (
         <div className="bg-white rounded-lg shadow-lg p-6 md:p-8 text-gray-800">
@@ -38,10 +74,10 @@ const ReservationApprovalScreen = () => {
                             <tr key={res.id} className="border-b hover:bg-gray-50">
                                 <td className="p-3 font-semibold">{res.user_name}</td>
                                 <td className="p-3">{res.facility_name}</td>
-                                <td className="p-3">{res.start_time}</td>
+                                <td className="p-3">{new Date(res.start_time).toLocaleString()}</td>
                                 <td className="p-3">
                                     <span className={`px-2 py-1 text-xs rounded-full font-medium ${statusColor[res.status]}`}>
-                                        {statusText[res.status]}
+                                        {res.status}
                                     </span>
                                 </td>
                                 <td className="p-3 text-center">
@@ -60,4 +96,5 @@ const ReservationApprovalScreen = () => {
         </div>
     );
 };
+
 export default ReservationApprovalScreen;

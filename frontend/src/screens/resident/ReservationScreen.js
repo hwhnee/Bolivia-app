@@ -1,50 +1,103 @@
-// (auto-concat)
-import React, { useState } from 'react';
-import { useAppContext } from '../../contexts/AppContext';
-import PhoneMockup from '../../components/common/PhoneMockup';
-import HomeButton from '../../components/common/HomeButton';
-import Modal from '../../components/common/Modal';
-// --- /src/screens/resident/ReservationScreen.js ---
+
+import React, { useState, useEffect } from 'react';
+import { useAppContext } from '../../contexts/AppContext'; // La ruta puede variar
+import { PhoneMockup } from '../../components/common/PhoneMockup'; // La ruta puede variar
+import { Modal } from '../../components/common/Modal'; // La ruta puede variar
+import { HomeButton } from '../../components/common/HomeButton'; // La ruta puede variar
+
 const ReservationScreen = () => {
     const { showToast } = useAppContext();
+    const [facilities, setFacilities] = useState([]);
+    const [reservations, setReservations] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedFacility, setSelectedFacility] = useState(null);
-    const [reservations, setReservations] = useState([
-        { id: 1, facility_id: 1, facility_name: 'Área de Barbacoa', start_time: '2025-08-15 18:00', end_time: '20:00', status: 'Aprobada' },
-        { id: 2, facility_id: 3, facility_name: 'Sala de Reuniones', start_time: '2025-08-16 10:00', end_time: '11:00', status: 'Pendiente' },
-    ]);
+    const [reservationDate, setReservationDate] = useState('');
+    const [reservationTime, setReservationTime] = useState('10:00-12:00');
 
-    const facilities = [
-        { id: 1, name: 'Área de Barbacoa', description: 'Instalación al aire libre para barbacoas, con capacidad para 10 personas.' },
-        { id: 2, name: 'Gimnasio', description: 'Espacio de entrenamiento con equipos modernos.' },
-        { id: 3, name: 'Sala de Reuniones', description: 'Espacio para reuniones de hasta 8 personas, equipado con proyector.' },
-    ];
-    
+    const fetchAllData = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const [facilitiesRes, reservationsRes] = await Promise.all([
+                fetch('/api/facilities'),
+                fetch('/api/reservations')
+            ]);
+            if (!facilitiesRes.ok || !reservationsRes.ok) {
+                throw new Error('No se pudieron cargar los datos de reserva.');
+            }
+            const facilitiesData = await facilitiesRes.json();
+            const reservationsData = await reservationsRes.json();
+            setFacilities(facilitiesData);
+            setReservations(reservationsData);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchAllData();
+    }, []);
+
     const handleReserveClick = (facility) => {
         setSelectedFacility(facility);
         setIsModalOpen(true);
     };
 
-    const handleConfirmReservation = () => {
-        const newReservation = {
-            id: Date.now(),
-            facility_id: selectedFacility.id,
-            facility_name: selectedFacility.name,
-            start_time: '2025-08-20 14:00', // This would come from form inputs
-            end_time: '16:00',
-            status: 'Pendiente'
-        };
-        setReservations(prev => [newReservation, ...prev]);
-        setIsModalOpen(false);
-        showToast(`La solicitud de reserva para ${selectedFacility.name} ha sido enviada.`);
+    const handleConfirmReservation = async () => {
+        if (!reservationDate) {
+            showToast("Por favor, seleccione una fecha.");
+            return;
+        }
+        
+        const [startTime, endTime] = reservationTime.split('-');
+        const startDateTime = `${reservationDate}T${startTime.trim()}`;
+        const endDateTime = `${reservationDate}T${endTime.trim()}`;
+
+        try {
+            const response = await fetch('/api/reservations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    facilityId: selectedFacility.id,
+                    startTime: startDateTime,
+                    endTime: endDateTime,
+                })
+            });
+            if (!response.ok) throw new Error("No se pudo crear la reserva.");
+
+            setIsModalOpen(false);
+            showToast(`La solicitud de reserva para ${selectedFacility.name} ha sido enviada.`);
+            fetchAllData(); // Recargar datos
+        } catch (err) {
+            showToast(`Error: ${err.message}`);
+        }
     };
     
-    const handleCancelReservation = (reservationId) => {
-        setReservations(prev => prev.map(r => r.id === reservationId ? {...r, status: 'Cancelada'} : r));
-        showToast("La reserva ha sido cancelada.");
+    const handleCancelReservation = async (reservationId) => {
+        if (!window.confirm("¿Está seguro de que desea cancelar esta reserva?")) return;
+
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}/cancel`, {
+                method: 'PUT'
+            });
+            if (!response.ok) throw new Error("No se pudo cancelar la reserva.");
+            
+            showToast("La reserva ha sido cancelada.");
+            fetchAllData(); // Recargar datos
+        } catch (err) {
+            showToast(`Error: ${err.message}`);
+        }
     };
 
     const statusColor = { 'Aprobada': 'text-green-500', 'Pendiente': 'text-yellow-500', 'Rechazada': 'text-red-500', 'Cancelada': 'text-gray-500' };
+
+    if (isLoading) return <PhoneMockup theme="light"><div className="text-center p-10">Cargando...</div></PhoneMockup>;
+    if (error) return <PhoneMockup theme="light"><div className="text-center p-10 text-red-500">Error: {error}</div></PhoneMockup>;
 
     return (
         <>
@@ -73,7 +126,7 @@ const ReservationScreen = () => {
                                         <div className="flex justify-between items-start">
                                             <div>
                                                 <p className="font-bold">{r.facility_name}</p>
-                                                <p className="text-xs text-gray-500">{r.start_time} ~ {r.end_time}</p>
+                                                <p className="text-xs text-gray-500">{new Date(r.start_time).toLocaleString()} ~ {new Date(r.end_time).toLocaleTimeString()}</p>
                                             </div>
                                             <p className={`text-xs font-bold ${statusColor[r.status]}`}>{r.status}</p>
                                         </div>
@@ -91,14 +144,14 @@ const ReservationScreen = () => {
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Seleccionar Fecha</label>
-                        <input type="date" className="w-full p-2 border rounded mt-1" />
+                        <input type="date" value={reservationDate} onChange={(e) => setReservationDate(e.target.value)} className="w-full p-2 border rounded mt-1" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Seleccionar Hora</label>
-                        <select className="w-full p-2 border rounded mt-1">
-                            <option>10:00 - 12:00</option>
-                            <option>14:00 - 16:00</option>
-                            <option>18:00 - 20:00</option>
+                        <select value={reservationTime} onChange={(e) => setReservationTime(e.target.value)} className="w-full p-2 border rounded mt-1">
+                            <option>10:00-12:00</option>
+                            <option>14:00-16:00</option>
+                            <option>18:00-20:00</option>
                         </select>
                     </div>
                     <button onClick={handleConfirmReservation} className="w-full p-2 rounded bg-teal-600 text-white hover:bg-teal-700">Solicitar Reserva</button>

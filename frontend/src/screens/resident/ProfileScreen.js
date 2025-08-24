@@ -1,9 +1,9 @@
-// (auto-concat)
+
 import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../../contexts/AppContext';
-import PhoneMockup from '../../components/common/PhoneMockup';
-import HomeButton from '../../components/common/HomeButton';
-// --- /src/screens/resident/ProfileScreen.js ---
+import { useAppContext } from '../../contexts/AppContext'; // La ruta puede variar
+import { PhoneMockup } from '../../components/common/PhoneMockup'; // La ruta puede variar
+import { HomeButton } from '../../components/common/HomeButton'; // La ruta puede variar
+
 const ProfileScreen = () => {
     const { showToast, handleLogout, currentUser, setCurrentUser } = useAppContext();
     const [isEditing, setIsEditing] = useState(false);
@@ -11,7 +11,9 @@ const ProfileScreen = () => {
         username: currentUser?.username || '',
         email: currentUser?.email || ''
     });
+    const [isLoading, setIsLoading] = useState(false);
 
+    // Sincroniza el formulario si los datos del usuario cambian
     useEffect(() => {
         if (currentUser) {
             setFormData({
@@ -26,10 +28,33 @@ const ProfileScreen = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSave = () => {
-        setCurrentUser(prev => ({ ...prev, ...formData }));
-        setIsEditing(false);
-        showToast("El perfil ha sido actualizado exitosamente.");
+    // Manejador para guardar los cambios en el perfil
+    const handleSave = async () => {
+        setIsLoading(true);
+        try {
+            const response = await fetch('/api/users/profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Error al guardar el perfil.');
+            }
+
+            const updatedProfile = await response.json();
+
+            // Actualiza el estado global del usuario con la nueva información
+            setCurrentUser(prev => ({ ...prev, ...updatedProfile }));
+            setIsEditing(false);
+            showToast("El perfil ha sido actualizado exitosamente.");
+
+        } catch (error) {
+            showToast(`Error: ${error.message}`);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const InfoRow = ({ label, value }) => (
@@ -61,7 +86,9 @@ const ProfileScreen = () => {
                                 <input name="email" type="email" value={formData.email} onChange={handleInputChange} className="w-full p-2 border rounded mt-1 text-sm" />
                             </div>
                             <div className="flex gap-2 pt-2">
-                                <button onClick={handleSave} className="w-full bg-teal-600 text-white p-2 rounded text-sm hover:bg-teal-700">Guardar</button>
+                                <button onClick={handleSave} disabled={isLoading} className="w-full bg-teal-600 text-white p-2 rounded text-sm hover:bg-teal-700 disabled:opacity-50">
+                                    {isLoading ? 'Guardando...' : 'Guardar'}
+                                </button>
                                 <button onClick={() => setIsEditing(false)} className="w-full bg-gray-300 text-gray-800 p-2 rounded text-sm hover:bg-gray-400">Cancelar</button>
                             </div>
                         </div>

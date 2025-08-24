@@ -1,30 +1,88 @@
-// (auto-concat)
-import React, { useState } from 'react';
-import PhoneMockup from '../../components/common/PhoneMockup';
-import Modal from '../../components/common/Modal';
-import HomeButton from '../../components/common/HomeButton';
-// --- /src/screens/resident/PaymentScreen.js ---
+
+import React, { useState, useEffect } from 'react';
+import { useAppContext } from '../../contexts/AppContext'; // La ruta puede variar
+import { PhoneMockup } from '../../components/common/PhoneMockup'; // La ruta puede variar
+import { Modal } from '../../components/common/Modal'; // La ruta puede variar
+import { HomeButton } from '../../components/common/HomeButton'; // La ruta puede variar
 
 const PaymentScreen = () => {
+    const { showToast } = useAppContext();
+    const [bills, setBills] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+    
     const [isQrModalOpen, setIsQrModalOpen] = useState(false);
     const [selectedBill, setSelectedBill] = useState(null);
+    const [payingBillId, setPayingBillId] = useState(null);
 
-    const mockBills = [
-        { id: 1, bill_month: '2025-08', total_amount: 150000, status: 'Pendiente', due_date: '2025-08-31', items: [
-            { item_name: 'Cuota de administración', amount: 100000 },
-            { item_name: 'Consumo de agua', amount: 30000 },
-            { item_name: 'Electricidad común', amount: 20000 },
-        ]},
-        { id: 2, bill_month: '2025-07', total_amount: 145000, status: 'Pagado', due_date: '2025-07-31', items: [
-            { item_name: 'Cuota de administración', amount: 100000 },
-            { item_name: 'Consumo de agua', amount: 25000 },
-            { item_name: 'Electricidad común', amount: 20000 },
-        ]},
-    ];
+    // Al cargar el componente, se obtiene la lista de facturas desde la API
+    useEffect(() => {
+        const fetchBills = async () => {
+            try {
+                // Llamada a la API del backend a través del proxy de Nginx
+                const response = await fetch('/api/bills');
+                if (!response.ok) {
+                    throw new Error('No se pudo cargar la información de las facturas.');
+                }
+                const data = await response.json();
+                setBills(data);
+            } catch (err) {
+                setError(err.message);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchBills();
+    }, []);
 
     const toggleBillDetails = (billId) => {
         setSelectedBill(selectedBill === billId ? null : billId);
     };
+
+    // Manejador para procesar el pago con QR
+    const handlePayment = async () => {
+        setIsQrModalOpen(false);
+        showToast("Procesando el pago...");
+
+        try {
+            const response = await fetch('/api/payments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ billId: payingBillId })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'El pago falló.');
+            }
+            
+            // Si el pago es exitoso, actualiza el estado de la factura en la UI a 'Pagado'
+            setBills(prevBills => 
+                prevBills.map(bill => 
+                    bill.id === payingBillId ? { ...bill, status: 'Pagado' } : bill
+                )
+            );
+            showToast("¡Pago completado con éxito!");
+
+        } catch (err) {
+            showToast(`Error: ${err.message}`);
+        } finally {
+            setPayingBillId(null);
+        }
+    };
+    
+    const openQrModal = (billId) => {
+        setPayingBillId(billId);
+        setIsQrModalOpen(true);
+    };
+
+    if (isLoading) {
+        return <PhoneMockup theme="light"><div className="text-center p-10">Cargando...</div></PhoneMockup>;
+    }
+    
+    if (error) {
+        return <PhoneMockup theme="light"><div className="text-center p-10 text-red-500">Error: {error}</div></PhoneMockup>;
+    }
 
     return (
         <>
@@ -33,7 +91,7 @@ const PaymentScreen = () => {
                     <HomeButton />
                     <h3 className="text-xl font-bold text-center mb-4">Pagos y Facturación</h3>
                     <div className="space-y-3 overflow-y-auto flex-grow">
-                        {mockBills.map(bill => (
+                        {bills.map(bill => (
                             <div key={bill.id} className="bg-white rounded-lg shadow p-3 cursor-pointer" onClick={() => toggleBillDetails(bill.id)}>
                                 <div className="flex justify-between items-center">
                                     <div>
@@ -42,7 +100,7 @@ const PaymentScreen = () => {
                                     </div>
                                     <div className="text-right">
                                         <p className={`font-bold ${bill.status === 'Pendiente' ? 'text-red-500' : 'text-green-500'}`}>{bill.status}</p>
-                                        <p className="text-sm">{bill.total_amount.toLocaleString()} $</p>
+                                        <p className="text-sm">{Number(bill.total_amount).toLocaleString()} $</p>
                                     </div>
                                 </div>
                                 {selectedBill === bill.id && (
@@ -51,11 +109,11 @@ const PaymentScreen = () => {
                                         {bill.items.map(item => (
                                             <div key={item.item_name} className="flex justify-between">
                                                 <span>{item.item_name}</span>
-                                                <span>{item.amount.toLocaleString()} $</span>
+                                                <span>{Number(item.amount).toLocaleString()} $</span>
                                             </div>
                                         ))}
                                         {bill.status === 'Pendiente' && (
-                                            <button onClick={(e) => { e.stopPropagation(); setIsQrModalOpen(true); }} className="w-full mt-3 p-2 rounded bg-teal-600 text-white hover:bg-teal-700 font-bold text-sm transition-colors">
+                                            <button onClick={(e) => { e.stopPropagation(); openQrModal(bill.id); }} className="w-full mt-3 p-2 rounded bg-teal-600 text-white hover:bg-teal-700 font-bold text-sm transition-colors">
                                                 Pagar con Código QR
                                             </button>
                                         )}
@@ -69,8 +127,10 @@ const PaymentScreen = () => {
             <Modal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} title="Pago con Código QR">
                 <p className="text-center">Escanee el código QR para pagar las cuotas de mantenimiento.</p>
                 <img src="https://placehold.co/300x300/ffffff/000000?text=Código+QR+de+Pago" alt="Payment QR Code" className="mx-auto mt-4 rounded-lg" />
+                <button onClick={handlePayment} className="w-full mt-4 p-2 rounded bg-teal-600 text-white hover:bg-teal-700 font-bold">Confirmar Pago (Simulación)</button>
             </Modal>
         </>
     );
 };
+
 export default PaymentScreen;

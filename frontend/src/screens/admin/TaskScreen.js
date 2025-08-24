@@ -1,18 +1,34 @@
-// (auto-concat)
-import React, { useState } from 'react';
-import { useAppContext } from '../../contexts/AppContext';
-// --- /src/screens/admin/TaskScreen.js ---
+import React, { useState, useEffect } from 'react';
+import { useAppContext } from '../../contexts/AppContext'; // La ruta puede variar
 
 const TaskScreen = () => {
     const { showToast } = useAppContext();
-    const [requests, setRequests] = useState([
-        { id: 1, requester_name: 'Juan Residente (101-1502)', category: 'Plomería', description: 'Fuga de agua en el fregadero de la cocina', status: 'Completado', created_at: '2025-08-01' },
-        { id: 2, requester_name: 'Ana Solicitante (102-303)', category: 'Electricidad', description: 'La luz de la sala parpadea', status: 'En Proceso', created_at: '2025-08-09' },
-        { id: 3, requester_name: 'Carlos Vecino (103-101)', category: 'Instalación', description: 'La barrera del estacionamiento subterráneo no funciona bien', status: 'Recibido', created_at: '2025-08-10' },
-    ]);
+    const [requests, setRequests] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+
     const [isFormVisible, setIsFormVisible] = useState(false);
     const [editingRequest, setEditingRequest] = useState(null);
     const [formData, setFormData] = useState({ requester_name: '', category: 'Plomería', description: '', status: 'Recibido' });
+
+    const fetchRequests = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const response = await fetch('/api/admin/tasks');
+            if (!response.ok) throw new Error('No se pudo cargar la lista de solicitudes.');
+            const data = await response.json();
+            setRequests(data);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchRequests();
+    }, []);
 
     const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
     
@@ -23,10 +39,16 @@ const TaskScreen = () => {
         window.scrollTo(0, 0);
     };
 
-    const handleDelete = (reqId) => {
+    const handleDelete = async (reqId) => {
         if (window.confirm("¿Realmente desea eliminar esta solicitud?")) {
-            setRequests(requests.filter(r => r.id !== reqId));
-            showToast("La solicitud ha sido eliminada.");
+            try {
+                const response = await fetch(`/api/admin/tasks/${reqId}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('No se pudo eliminar la solicitud.');
+                showToast("La solicitud ha sido eliminada.");
+                fetchRequests(); // Recargar la lista
+            } catch (err) {
+                showToast(`Error: ${err.message}`);
+            }
         }
     };
 
@@ -37,19 +59,33 @@ const TaskScreen = () => {
         window.scrollTo(0, 0);
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (editingRequest) {
-            setRequests(requests.map(r => r.id === editingRequest.id ? { ...r, ...formData } : r));
-            showToast("La información de la solicitud ha sido actualizada.");
-        } else {
-            setRequests([{ ...formData, id: Date.now(), created_at: new Date().toISOString().split('T')[0] }, ...requests]);
-            showToast("Se ha registrado una nueva solicitud.");
+        const url = editingRequest ? `/api/admin/tasks/${editingRequest.id}` : '/api/admin/tasks';
+        const method = editingRequest ? 'PUT' : 'POST';
+
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.message || 'La operación falló.');
+            }
+            showToast(editingRequest ? "La solicitud ha sido actualizada." : "Se ha registrado una nueva solicitud.");
+            setIsFormVisible(false);
+            fetchRequests(); // Recargar la lista
+        } catch (err) {
+            showToast(`Error: ${err.message}`);
         }
-        setIsFormVisible(false);
     };
 
     const statusColor = { 'Recibido': 'text-yellow-800 bg-yellow-100', 'En Proceso': 'text-blue-800 bg-blue-100', 'Completado': 'text-green-800 bg-green-100', 'En Espera': 'text-gray-800 bg-gray-100' };
+
+    if (isLoading) return <div className="p-6 text-center">Cargando...</div>;
+    if (error) return <div className="p-6 text-center text-red-500">Error: {error}</div>;
 
     return (
         <div className="bg-white rounded-lg shadow-lg p-6 md:p-8 text-gray-800">
@@ -61,7 +97,7 @@ const TaskScreen = () => {
             {isFormVisible && (
                 <form onSubmit={handleSubmit} className="bg-gray-50 p-4 rounded-lg mb-6 space-y-3 border">
                     <h3 className="text-lg font-semibold">{editingRequest ? 'Editar Solicitud' : 'Registrar Nuevo Caso'}</h3>
-                    <input name="requester_name" value={formData.requester_name} onChange={handleInputChange} placeholder="Solicitante (Ej: Juan Residente 101-1502)" className="w-full p-2 border rounded" required />
+                    <input name="requester_name" value={formData.requester_name} onChange={handleInputChange} placeholder="Solicitante (Ej: Juan Residente)" className="w-full p-2 border rounded" required />
                     <select name="category" value={formData.category} onChange={handleInputChange} className="w-full p-2 border rounded bg-white"><option>Plomería</option><option>Electricidad</option><option>Instalación</option><option>Otro</option></select>
                     <textarea name="description" value={formData.description} onChange={handleInputChange} placeholder="Descripción Detallada" className="w-full p-2 border rounded" required />
                     <select name="status" value={formData.status} onChange={handleInputChange} className="w-full p-2 border rounded bg-white"><option>Recibido</option><option>En Proceso</option><option>Completado</option><option>En Espera</option></select>
@@ -94,4 +130,5 @@ const TaskScreen = () => {
         </div>
     );
 };
+
 export default TaskScreen;

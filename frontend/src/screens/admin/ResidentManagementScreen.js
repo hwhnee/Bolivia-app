@@ -1,36 +1,92 @@
-// (auto-concat)
-import React, { useState } from 'react';
-import { useAppContext } from '../../contexts/AppContext';
-// --- /src/screens/admin/ResidentManagementScreen.js ---
+
+import React, { useState, useEffect } from 'react';
+import { useAppContext } from '../../contexts/AppContext'; // La ruta puede variar
 
 const ResidentManagementScreen = () => {
     const { showToast } = useAppContext();
-    const [bills, setBills] = useState([
-        { id: 1, household_id: 1, household_name: 'Torre 101 Apto 1502', bill_month: '2025-08', total_amount: 150000, status: 'Pendiente', due_date: '2025-08-31', items: [{ item_name: 'Cuota de administración', amount: 100000 }, { item_name: 'Consumo de agua', amount: 30000 }] },
-        { id: 2, household_id: 2, household_name: 'Torre 102 Apto 303', bill_month: '2025-08', total_amount: 145000, status: 'Pagado', due_date: '2025-08-31', items: [] },
-        { id: 3, household_id: 1, household_name: 'Torre 101 Apto 1502', bill_month: '2025-07', total_amount: 148000, status: 'Pagado', due_date: '2025-07-31', items: [] },
-    ]);
+    const [bills, setBills] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+
     const [isFormVisible, setIsFormVisible] = useState(false);
     const [editingBill, setEditingBill] = useState(null);
     const [formData, setFormData] = useState({ household_name: '', bill_month: '', total_amount: '', status: 'Pendiente', due_date: '' });
 
-    const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-    const handleEdit = (bill) => { setEditingBill(bill); setFormData(bill); setIsFormVisible(true); };
-    const handleDelete = (billId) => { if (window.confirm("¿Realmente desea eliminar esta factura?")) { setBills(bills.filter(b => b.id !== billId)); showToast("La factura ha sido eliminada."); } };
-    const handleAddNew = () => { setEditingBill(null); setFormData({ household_name: '', bill_month: '2025-09', total_amount: '', status: 'Pendiente', due_date: '' }); setIsFormVisible(true); };
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (editingBill) {
-            setBills(bills.map(b => b.id === editingBill.id ? { ...b, ...formData } : b));
-            showToast("La información de la factura ha sido actualizada.");
-        } else {
-            setBills([{ ...formData, id: Date.now(), items: [] }, ...bills]);
-            showToast("Se ha registrado una nueva factura.");
+    const fetchBills = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const response = await fetch('/api/admin/bills');
+            if (!response.ok) throw new Error('No se pudo cargar la lista de facturas.');
+            const data = await response.json();
+            setBills(data);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
         }
-        setIsFormVisible(false);
+    };
+
+    useEffect(() => {
+        fetchBills();
+    }, []);
+
+    const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+    
+    const handleEdit = (bill) => {
+        setEditingBill(bill);
+        // El formato de fecha para el input type="date" debe ser AAAA-MM-DD
+        const formattedBill = { ...bill, due_date: new Date(bill.due_date).toISOString().split('T')[0] };
+        setFormData(formattedBill);
+        setIsFormVisible(true);
+    };
+
+    const handleDelete = async (billId) => {
+        if (window.confirm("¿Realmente desea eliminar esta factura?")) {
+            try {
+                const response = await fetch(`/api/admin/bills/${billId}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('No se pudo eliminar la factura.');
+                showToast("La factura ha sido eliminada.");
+                fetchBills(); // Recargar la lista
+            } catch (err) {
+                showToast(`Error: ${err.message}`);
+            }
+        }
+    };
+
+    const handleAddNew = () => {
+        setEditingBill(null);
+        setFormData({ household_name: '', bill_month: '2025-09', total_amount: '', status: 'Pendiente', due_date: '' });
+        setIsFormVisible(true);
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        const url = editingBill ? `/api/admin/bills/${editingBill.id}` : '/api/admin/bills';
+        const method = editingBill ? 'PUT' : 'POST';
+
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.message || 'La operación falló.');
+            }
+            showToast(editingBill ? "La factura ha sido actualizada." : "Se ha registrado una nueva factura.");
+            setIsFormVisible(false);
+            fetchBills(); // Recargar la lista
+        } catch (err) {
+            showToast(`Error: ${err.message}`);
+        }
     };
 
     const statusColor = { 'Pendiente': 'text-red-500', 'Pagado': 'text-green-500', 'Pago Parcial': 'text-yellow-500' };
+
+    if (isLoading) return <div className="p-6 text-center">Cargando...</div>;
+    if (error) return <div className="p-6 text-center text-red-500">Error: {error}</div>;
 
     return (
         <div className="bg-white rounded-lg shadow-lg p-6 md:p-8 text-gray-800">
@@ -42,8 +98,8 @@ const ResidentManagementScreen = () => {
             {isFormVisible && (
                 <form onSubmit={handleSubmit} className="bg-gray-50 p-4 rounded-lg mb-6 space-y-3 border">
                     <h3 className="text-lg font-semibold">{editingBill ? 'Editar Factura' : 'Registrar Nueva Factura'}</h3>
-                    <input name="household_name" value={formData.household_name} onChange={handleInputChange} placeholder="Unidad (Ej: Torre 101 Apto 1502)" className="w-full p-2 border rounded" required />
-                    <input name="bill_month" value={formData.bill_month} onChange={handleInputChange} placeholder="Mes de Facturación (AAAA-MM)" className="w-full p-2 border rounded" required />
+                    <input name="household_name" value={formData.household_name} onChange={handleInputChange} placeholder="Unidad (Ej: 101동 1502호)" className="w-full p-2 border rounded" required disabled={!!editingBill} />
+                    <input name="bill_month" value={formData.bill_month} onChange={handleInputChange} placeholder="Mes de Facturación (AAAA-MM)" className="w-full p-2 border rounded" required disabled={!!editingBill} />
                     <input name="total_amount" type="number" value={formData.total_amount} onChange={handleInputChange} placeholder="Monto Total" className="w-full p-2 border rounded" required />
                     <input name="due_date" type="date" value={formData.due_date} onChange={handleInputChange} className="w-full p-2 border rounded" required />
                     <select name="status" value={formData.status} onChange={handleInputChange} className="w-full p-2 border rounded bg-white">
@@ -78,4 +134,7 @@ const ResidentManagementScreen = () => {
         </div>
     );
 };
+
+
+
 export default ResidentManagementScreen;
