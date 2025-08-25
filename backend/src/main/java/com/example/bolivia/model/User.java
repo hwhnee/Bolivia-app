@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -18,19 +19,56 @@ import java.util.Collections;
 public class User implements UserDetails {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "household_id")
     private Long householdId;
+
+    @Column(name = "apt_code")
     private String aptCode;
+
+    @Column(name = "dong")
     private String dong;
+
+    @Column(name = "ho")
     private String ho;
+
+    @Column(name = "display_name")
     private String displayName;
-    @Column(insertable=false, updatable=false)
+
+    @Column(name = "username", unique = true)
     private String username;
+
+    @Column(name = "email", unique = true)
     private String email;
+
+    @Column(name = "password_hash")
     private String passwordHash;
+
     @Enumerated(EnumType.STRING)
+    @Column(name = "role")
     private Role role;
+
     @Enumerated(EnumType.STRING)
+    @Column(name = "status")
     private Status status;
+    
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
 
     public enum Role { RESIDENT, ADMIN }
     public enum Status { PENDING, ACTIVE, LOCKED }
@@ -39,42 +77,36 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Enum 타입의 role을 Spring Security가 이해하는 "ROLE_" 접두사를 붙인 문자열로 변환합니다.
-        // 예: Role.ADMIN -> "ROLE_ADMIN"
         return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + this.role.name()));
     }
 
     @Override
     public String getPassword() {
-        // 비밀번호 필드명인 'passwordHash'를 반환합니다.
         return this.passwordHash;
     }
 
     @Override
     public String getUsername() {
-        // 로그인 ID 필드명인 'username'을 반환합니다.
         return this.username;
     }
 
     @Override
     public boolean isAccountNonExpired() {
-        return true; // 계정 만료 로직이 없으므로 true 반환
+        return true;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        // 계정 상태가 LOCKED가 아니면 true를 반환합니다.
         return this.status != Status.LOCKED;
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return true; // 자격 증명 만료 로직이 없으므로 true 반환
+        return true;
     }
 
     @Override
     public boolean isEnabled() {
-        // 계정 상태가 ACTIVE이면 true를 반환합니다.
         return this.status == Status.ACTIVE;
     }
 }
