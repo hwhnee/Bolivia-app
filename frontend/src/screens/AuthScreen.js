@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../contexts/AppContext'; // La ruta puede variar
-import PhoneMockup from '../../components/common/PhoneMockup';
+import PhoneMockup from '../components/common/PhoneMockup';
 
 const AuthScreen = () => {
     const { handleLoginSuccess } = useAppContext();

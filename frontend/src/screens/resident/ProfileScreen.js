@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../contexts/AppContext'; // La ruta puede variar
 import PhoneMockup from '../../components/common/PhoneMockup';
-import { HomeButton } from '../../components/common/HomeButton'; // La ruta puede variar
+import HomeButton from '../../components/common/HomeButton'; // La ruta puede variar
 
 const ProfileScreen = () => {
     const { showToast, handleLogout, currentUser, setCurrentUser } = useAppContext();
